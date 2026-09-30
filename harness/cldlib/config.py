@@ -54,6 +54,7 @@ class Config:
     heavy_processes: tuple[str, ...]
     lenses: tuple[tuple[str, str], ...]      # (glob, 관점 이름)
     gates: tuple[Gate, ...] = field(default_factory=tuple)
+    plan_state_column: str = "상태"          # 마스터 플랜 Phase 표에서 상태를 읽는 열(기존 문서에 붙일 때 바꾼다)
 
     def path(self, rel: str) -> str:
         """저장소 루트 기준 상대 경로를 절대 경로로."""
@@ -134,4 +135,5 @@ def load(start: str = ".") -> Config:
         heavy_processes=tuple(str(x) for x in _get(d, "verify.heavy_processes", [])),
         lenses=tuple((str(k), str(v)) for k, v in lenses_raw.items()),
         gates=tuple(_gate(g, i) for i, g in enumerate(gates_raw, 1)),
+        plan_state_column=str(_get(d, "plan.state_column", "상태")),
     )

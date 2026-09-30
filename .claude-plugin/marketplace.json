@@ -9,7 +9,7 @@
       "name": "closed-loop-dev",
       "source": "./",
       "description": "폐루프 개발 프로세스 — 계획 · 세션 프롬프트 · 인수인계 · 독립 검증을 스킬 · 에이전트 · 훅 · 하네스로.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

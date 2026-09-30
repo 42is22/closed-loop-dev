@@ -11,6 +11,9 @@
 
 사용:
     python scripts/install.py --target <저장소> --name "<프로젝트>" [--slug x] [--cursor] [--no-hooks] [--dry-run] [--force]
+기존 문서가 있는 저장소(도입):
+    python scripts/install.py --target <저장소> --name "<프로젝트>" --adopt --master-plan <경로> --session-prompts <경로> \
+        --handover <경로> [--tasks-dir tasks] [--changelog CHANGELOG.md] [--plan-state-column 상태] [--rules process,verification]
 표준 라이브러리만 쓴다(Python 3.11+).
 """
 from __future__ import annotations
@@ -94,14 +97,14 @@ def merge_hooks(settings_path: str, dry: bool) -> str:
     return f"훅 {added}개 더함" if added else "훅 이미 있음(그대로)"
 
 
-def cursor_rules(target: str, values: dict, force: bool, dry: bool, out: list) -> None:
+def cursor_rules(target: str, values: dict, force: bool, dry: bool, out: list, rules: list[str]) -> None:
     """규칙 · 스킬을 Cursor .mdc 로 옮긴다(규칙은 항상 적용, 스킬은 설명으로 요청 시)."""
     dst_dir = os.path.join(target, ".cursor", "rules")
     items: list[tuple[str, str, str, bool]] = []
     for f in sorted(os.listdir(os.path.join(TOOL_ROOT, "rules"))):
-        if f.endswith(".md"):
-            text = Path(os.path.join(TOOL_ROOT, "rules", f)).read_text(encoding="utf-8")
-            items.append((f[:-3], f"closed-loop-dev 규칙 — {f[:-3]}", initcmd._render(text, values), True))
+        if f.endswith(".md") and f[len("cld-"):-3] in rules:
+            meta, body = _frontmatter(Path(os.path.join(TOOL_ROOT, "rules", f)).read_text(encoding="utf-8"))
+            items.append((f[:-3], meta.get("description", f"closed-loop-dev 규칙 — {f[:-3]}"), initcmd._render(body, values), True))
     for d in sorted(os.listdir(os.path.join(TOOL_ROOT, "skills"))):
         p = os.path.join(TOOL_ROOT, "skills", d, "SKILL.md")
         if os.path.isfile(p):
@@ -135,6 +138,14 @@ def main(argv: list[str]) -> int:
     p.add_argument("--no-hooks", action="store_true", help=".claude/settings.json 에 훅을 넣지 않는다")
     p.add_argument("--no-writing-rule", action="store_true")
     p.add_argument("--force", action="store_true", help="있는 파일도 덮는다")
+    p.add_argument("--adopt", action="store_true", help="기존 문서에 붙는다(문서 틀을 만들지 않는다)")
+    p.add_argument("--master-plan", default="")
+    p.add_argument("--session-prompts", default="")
+    p.add_argument("--handover", default="")
+    p.add_argument("--tasks-dir", default="tasks")
+    p.add_argument("--changelog", default="CHANGELOG.md")
+    p.add_argument("--plan-state-column", default="상태")
+    p.add_argument("--rules", default="", help="깔 규칙(쉼표): process,git,verification,writing — 기본 전부")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
     target = os.path.abspath(a.target)
@@ -142,6 +153,13 @@ def main(argv: list[str]) -> int:
         print(f"대상 폴더가 없다: {target}", file=sys.stderr)
         return 2
     name = a.name or os.path.basename(target)
+    adopt = None
+    if a.adopt:
+        if not (a.master_plan and a.session_prompts and a.handover):
+            print("--adopt 는 --master-plan · --session-prompts · --handover 가 필요하다(저장소 루트 기준 경로)", file=sys.stderr)
+            return 2
+        adopt = initcmd.Adopt(a.master_plan, a.session_prompts, a.handover, a.tasks_dir, a.changelog, a.plan_state_column)
+    rules = [r.strip() for r in a.rules.split(",") if r.strip()] if a.rules else None
     cwd = os.getcwd()
     os.chdir(target)
     out: list[tuple[str, str]] = []
@@ -149,16 +167,18 @@ def main(argv: list[str]) -> int:
         for d in sorted(os.listdir(os.path.join(TOOL_ROOT, "skills"))):
             _copy_tree(os.path.join(TOOL_ROOT, "skills", d), os.path.join(target, ".claude", "skills", d), a.force, a.dry_run, out)
         _copy_tree(os.path.join(TOOL_ROOT, "agents"), os.path.join(target, ".claude", "agents"), a.force, a.dry_run, out)
-        res = initcmd.run(target, name, a.slug, a.date, "docs", a.force, a.dry_run, not a.no_writing_rule, False)
+        res = initcmd.run(target, name, a.slug, a.date, "docs", a.force, a.dry_run, not a.no_writing_rule, False, adopt, rules)
         out += res
         if not a.no_hooks:
             out.append((".claude/settings.json", merge_hooks(os.path.join(target, ".claude", "settings.json"), a.dry_run)))
         if a.cursor:
             import datetime as _dt
             dd = _dt.date.fromisoformat(a.date) if a.date else _dt.date.today()
-            _items, names = initcmd.plan(name, a.slug or initcmd.slugify(name), dd.strftime("%Y%m%d"), "docs", True)
+            _items, names = initcmd.plan(name, a.slug or initcmd.slugify(name), dd.strftime("%Y%m%d"), "docs",
+                                         not a.no_writing_rule, adopt, rules)
             values = {"PROJECT": name, "DATE": dd.isoformat(), **names}
-            cursor_rules(target, values, a.force, a.dry_run, out)
+            chosen = [p.src[len("rules/cld-"):-3] for p in _items if p.src.startswith("rules/")]
+            cursor_rules(target, values, a.force, a.dry_run, out, chosen)
     finally:
         os.chdir(cwd)
     for dst, what in out:

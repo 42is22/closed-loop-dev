@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-30
+
+기존 문서가 있는 저장소에 붙이는 «도입» 방식. 첫 적용 대상은 계획 · 세션 프롬프트 · 인수인계가 이미 있던 저장소다.
+
+- **도입**: `cld.py init --adopt --master-plan … --session-prompts … --handover …` · `install.py --adopt …` — 문서 틀 · tasks · CHANGELOG 를 만들지 않고 설정이 기존 문서를 가리킨다. 인수인계에 삽입 표식이 없으면 알린다. 도입할 문서가 없으면 멈춘다.
+- **규칙 고르기**: `--rules process,git,verification,writing`(기본 전부). 기존 규칙과 겹치는 것을 뺀다. Cursor 변환도 고른 것만.
+- **계획 표 상태 열**: `[plan] state_column`(기본 «상태»). 상태가 «내용» 칸 머리에 있는 표도 읽는다.
+- **status**: 세션 프롬프트 문서가 아직 cld 블록 형식이 아니면 안내(ℹ)만 한다(경고 아님).
+- **Stop 알림**: 세션당 한 번(세션 id 표식 — 응답마다 뜨지 않는다).
+- **규칙 머리**: 규칙 넷에 `description` · `alwaysApply: true` 머리(Cursor · 규칙 동기화 도구 호환 — Claude Code 는 무시). Cursor 변환이 그 머리를 쓴다.
+- **시험**: 34.
+
 ## [0.1.0] - 2026-09-30
 
 첫 판. 실제 제품 개발(2026-09)의 폐루프 절차를 프로젝트와 무관한 형태로 떼어 냈다.

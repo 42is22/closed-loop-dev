@@ -1,6 +1,6 @@
 {
   "name": "closed-loop-dev",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "폐루프 개발 프로세스 — 마스터 플랜 → Phase 세션 프롬프트 → 독립 구현 세션 → 인수인계 → 독립 검증 세션 → 마스터 플랜. 스킬 · 에이전트 · 훅 · 하네스.",
   "author": {
     "name": "Nam Seonho"

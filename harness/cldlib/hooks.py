@@ -17,6 +17,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from typing import Optional
 
 from . import config as cfgmod
@@ -164,9 +165,26 @@ def stop() -> int:
     code = [c for c in norm if any(c == p.rstrip("/") or c.startswith(p.rstrip("/") + "/") for p in cfg.code_paths)]
     ho = cfg.handover.replace("\\", "/")
     if code and ho not in norm:
+        mark = _once_marker(ev)
+        if mark is not None and os.path.exists(mark):
+            return 0      # 이 세션에서 이미 알렸다 — 응답마다 알리면 소음이 된다
         _emit({"systemMessage": (f"[closed-loop-dev] 코드 {len(code)}개 파일이 바뀌었는데 인수인계({cfg.handover})가 그대로다. "
-                                 "커밋 전에 맨 위 항목(네 칸)을 쓰거나 고친다 — `cld.py handover new|check`.")})
+                                 "커밋 전에 맨 위 항목(네 칸)을 쓰거나 고친다 — `cld.py handover new|check`. (이 세션에서 한 번만 알린다)")})
+        if mark is not None:
+            try:
+                with open(mark, "w", encoding="utf-8") as f:
+                    f.write("1")
+            except OSError:
+                pass
     return 0
+
+
+def _once_marker(ev: dict) -> Optional[str]:
+    """세션당 한 번 알림 표식 파일 경로(세션 id 가 없으면 None — 그때는 매번 알린다)."""
+    sid = re.sub(r"[^0-9A-Za-z_-]", "", str(ev.get("session_id") or ""))[:80]
+    if not sid:
+        return None
+    return os.path.join(tempfile.gettempdir(), f"cld_stop_reminded_{sid}")
 
 
 def main(which: str) -> int:

@@ -292,6 +292,95 @@ class TestGates(InitedRepo):
             self.cfg()
 
 
+class TestAdopt(unittest.TestCase):
+    """기존 문서가 있는 저장소에 붙는다 — 문서를 만들지 않고 설정이 기존 문서를 가리킨다."""
+
+    PLAN = ("# 계획\n\n| 순번 | Phase | 내용 | 특이 검증 |\n|---|---|---|---|\n"
+            "| ① | **0** | 🟢 **완료(2026-09-21)** — 기준선 | x |\n"
+            "| ② | **7** | 🟢 **T-87 완료(abc)** · 다음 = 7E | y |\n"
+            "| ③ | **8** | 문서 정리 | z |\n")
+    HANDOVER = ("# 인수인계\n\n## 1. 쓰는 법\n\n네 칸.\n\n"
+                "## 2. Phase 7E — 편집 (완료)\n\n### 깨지기 쉬운 것\n\n없음\n\n### 되돌리는 법\n\n없음\n\n"
+                "### 🔴 믿지 말 것\n\n없음\n\n### 🔴 다음 사람에게 (7-4 C4)\n\n하나.\n")
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp(prefix="cld_adopt_")
+        os.makedirs(os.path.join(self.tmp, "docs"))
+        Path(self.tmp, "docs", "PLN-x.md").write_text(self.PLAN, encoding="utf-8")
+        Path(self.tmp, "docs", "GDE-p.md").write_text("# 프롬프트\n\n## 11. Phase 7\n\n```\n옛 블록\n```\n", encoding="utf-8")
+        Path(self.tmp, "docs", "GDE-h.md").write_text(self.HANDOVER, encoding="utf-8")
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def adopt(self) -> initcmd.Adopt:
+        return initcmd.Adopt("docs/PLN-x.md", "docs/GDE-p.md", "docs/GDE-h.md", state_column="내용")
+
+    def test_no_docs_and_rules_chosen(self):
+        res = initcmd.run(self.tmp, "X", adopt=self.adopt(), rules=["process", "verification"])
+        made = {d for d, w in res if w == "만듦"}
+        self.assertEqual(made, {".cld/config.toml", ".claude/rules/cld-process.md", ".claude/rules/cld-verification.md", ".cld/harness"})
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "tasks")))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "CHANGELOG.md")))
+        self.assertTrue(any(w.startswith("⚠ 표식 없음") for _, w in res))
+        rule = Path(self.tmp, ".claude", "rules", "cld-process.md").read_text(encoding="utf-8")
+        self.assertIn("docs/GDE-h.md", rule)
+        cfg = config.load(self.tmp)
+        self.assertEqual((cfg.master_plan, cfg.handover, cfg.plan_state_column), ("docs/PLN-x.md", "docs/GDE-h.md", "내용"))
+
+    def test_missing_doc_and_bad_rule(self):
+        with self.assertRaises(FileNotFoundError):
+            initcmd.run(self.tmp, "X", adopt=initcmd.Adopt("docs/none.md", "docs/GDE-p.md", "docs/GDE-h.md"))
+        with self.assertRaises(ValueError):
+            initcmd.run(self.tmp, "X", adopt=self.adopt(), rules=["nope"])
+
+    def test_status_on_legacy_docs(self):
+        initcmd.run(self.tmp, "X", adopt=self.adopt(), rules=["process"])
+        h = Path(self.tmp, "docs", "GDE-h.md")
+        h.write_text(self.HANDOVER.replace("## 2. Phase 7E", handover.MARKER + "\n\n## 2. Phase 7E"), encoding="utf-8")
+        st = status.collect(config.load(self.tmp))
+        self.assertEqual([r.done for r in st.rows], [True, False, False])     # «T-87 완료» 는 Phase 7 의 완료가 아니다
+        self.assertEqual(st.next_phase.phase, "7")
+        self.assertEqual(st.handover_top, "2. Phase 7E — 편집 (완료)")
+        self.assertTrue(st.handover_ok)
+        self.assertIsNone(st.prompt_section)
+        self.assertTrue(any("cld 블록 형식이 아니다" in i for i in st.infos))
+        self.assertEqual(st.notes, ())
+
+    def test_cli_adopt_requires_paths(self):
+        r = _run(["init", "--target", self.tmp, "--adopt"], self.tmp)
+        self.assertEqual(r.returncode, 2)
+
+
+class TestStopOnce(InitedRepo):
+    def test_once_per_session(self):
+        import contextlib
+        import io
+        sid = f"t{os.getpid()}x{id(self)}"
+        mark = hooks._once_marker({"session_id": sid})
+        if mark and os.path.exists(mark):
+            os.remove(mark)
+        orig = hooks._changed
+        outs = []
+        try:
+            hooks._changed = lambda _cfg: ["src/a.py"]
+            for _ in range(2):
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    old, sys.stdin = sys.stdin, io.StringIO(json.dumps({"cwd": self.tmp, "session_id": sid}))
+                    try:
+                        hooks.stop()
+                    finally:
+                        sys.stdin = old
+                outs.append(buf.getvalue())
+        finally:
+            hooks._changed = orig
+            if mark and os.path.exists(mark):
+                os.remove(mark)
+        self.assertIn("systemMessage", outs[0])
+        self.assertEqual(outs[1], "")
+
+
 class TestMdText(unittest.TestCase):
     def test_fences_hide_headings(self):
         doc = "## A. 하나\n```text\n## B. 가짜\n```\n## C. 둘\n"
@@ -338,6 +427,9 @@ class TestInstall(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(tmp, ".claude", "skills", "cld-verify", "SKILL.md")))
             self.assertTrue(os.path.isfile(os.path.join(tmp, ".claude", "agents", "cld-reviewer.md")))
             self.assertTrue(os.path.isfile(os.path.join(tmp, ".cursor", "rules", "cld-process.mdc")))
+            mdc = Path(os.path.join(tmp, ".cursor", "rules", "cld-process.mdc")).read_text(encoding="utf-8")
+            self.assertEqual(mdc.count("\n---\n"), 1)                      # 머리가 두 번 들어가지 않는다
+            self.assertIn("alwaysApply: true", mdc)
             s = json.loads(Path(settings).read_text(encoding="utf-8"))
             self.assertEqual(s["permissions"]["deny"], ["Bash(git push:*)"])       # 있던 설정 보존
             cmds = json.dumps(s["hooks"], ensure_ascii=False)
@@ -362,6 +454,9 @@ class TestManifests(unittest.TestCase):
             head = text.split("\n---\n", 1)[0]
             self.assertIn(f"name: {d}", head)
             self.assertIn("description:", head)
+        for f in os.listdir(os.path.join(ROOT, "rules")):
+            head = Path(os.path.join(ROOT, "rules", f)).read_text(encoding="utf-8").split("\n---\n", 1)[0]
+            self.assertTrue(head.startswith("---\ndescription: ") and "alwaysApply: true" in head, f)   # Cursor · 규칙 동기화 도구 호환
         for f in os.listdir(os.path.join(ROOT, "agents")):
             head = Path(os.path.join(ROOT, "agents", f)).read_text(encoding="utf-8").split("\n---\n", 1)[0]
             self.assertIn("description:", head)

@@ -12,6 +12,9 @@ handover = "{{HANDOVER}}"
 tasks_dir = "{{TASKS_DIR}}"
 changelog = "{{CHANGELOG}}"
 
+[plan]
+state_column = "{{PLAN_STATE_COLUMN}}"      # 마스터 플랜 Phase 표에서 상태를 읽는 열(첫 낱말이 «완료» 면 끝난 행)
+
 [prompt]
 header_max_lines = 10          # 붙이는 머리(빈 줄 · 구분선 포함) 상한
 ultracode_keyword = "ultracode" # 🔴 세션 머리에만 들어가는 낱말(이 낱말이 모드를 켠다)

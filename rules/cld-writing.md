@@ -1,3 +1,7 @@
+---
+description: "글쓰기 문체(closed-loop-dev) — 결론 먼저 · 한 문장 한 명제 · 용어 정의 · 수치는 표"
+alwaysApply: true
+---
 # 글쓰기 문체 (closed-loop-dev)
 
 채팅 답변과 문서 양쪽에 적용한다. 목적은 하나다 — **읽는 사람이 한 번 읽고 이해하게 만든다.**

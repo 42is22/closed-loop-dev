@@ -1,3 +1,7 @@
+---
+description: "git 정책(closed-loop-dev) — 에이전트는 커밋 · 푸시 · 태그 · 작업 트리 변경을 하지 않는다 · 커밋 메시지 초안까지"
+alwaysApply: true
+---
 # git 정책 (closed-loop-dev)
 
 ## 에이전트가 하지 않는 것

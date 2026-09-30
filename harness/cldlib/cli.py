@@ -40,12 +40,23 @@ def _write_keep_eol(path: str, text_lf: str, original_raw: bytes) -> None:
 
 
 def cmd_init(a) -> int:
+    adopt = None
+    if a.adopt:
+        if not (a.master_plan and a.session_prompts and a.handover):
+            print("--adopt 는 --master-plan · --session-prompts · --handover 가 필요하다(저장소 루트 기준 경로)", file=sys.stderr)
+            return 2
+        adopt = initcmd.Adopt(a.master_plan, a.session_prompts, a.handover, a.tasks_dir, a.changelog, a.plan_state_column)
+    rules = [r.strip() for r in a.rules.split(",") if r.strip()] if a.rules else None
     res = initcmd.run(a.target, a.name or os.path.basename(os.path.abspath(a.target)), a.slug, a.date, a.docs_dir,
-                      a.force, a.dry_run, not a.no_writing_rule, a.upgrade_harness)
+                      a.force, a.dry_run, not a.no_writing_rule, a.upgrade_harness, adopt, rules)
     for dst, what in res:
         print(f"  {what:<32} {dst}")
     if a.dry_run:
         print("(dry-run — 아무것도 쓰지 않았다)")
+    elif a.upgrade_harness:
+        print("하네스 사본을 갱신했다(.cld/harness). 문서 · 설정 · 규칙은 건드리지 않았다.")
+    elif a.adopt:
+        print("다음: 인수인계 표식(⚠ 줄)을 넣고 .cld/config.toml 의 [[gates]] · [hooks].code_paths 를 채운다. 확인은 `cld.py status`.")
     else:
         print("다음: 마스터 플랜의 목표 · 완료 기준 · Phase 표를 채운다(스킬 cld-plan). 게이트는 .cld/config.toml [[gates]].")
     return 0
@@ -159,6 +170,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--dry-run", action="store_true")
     s.add_argument("--no-writing-rule", action="store_true", help="문체 규칙(cld-writing.md)을 깔지 않는다")
     s.add_argument("--upgrade-harness", action="store_true", help="하네스 사본만 갱신한다")
+    s.add_argument("--adopt", action="store_true", help="기존 문서에 붙는다(문서 틀을 만들지 않는다)")
+    s.add_argument("--master-plan", default="")
+    s.add_argument("--session-prompts", default="")
+    s.add_argument("--handover", default="")
+    s.add_argument("--tasks-dir", default="tasks")
+    s.add_argument("--changelog", default="CHANGELOG.md")
+    s.add_argument("--plan-state-column", default="상태", help="Phase 표에서 상태를 읽는 열")
+    s.add_argument("--rules", default="", help="깔 규칙(쉼표): process,git,verification,writing — 기본 전부")
     s.set_defaults(fn=cmd_init)
 
     s = sub.add_parser("status", help="폐루프 상태 요약")

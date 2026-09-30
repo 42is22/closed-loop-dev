@@ -1,3 +1,7 @@
+---
+description: "폐루프 개발 프로세스(closed-loop-dev) — 문서 셋의 역할 · 루프 한 바퀴 · 세션 규칙"
+alwaysApply: true
+---
 # 폐루프 개발 프로세스 (closed-loop-dev)
 
 이 저장소는 폐루프로 개발한다. 문서 셋이 세션 사이의 기억이고, 세션 두 종류가 번갈아 돈다.

@@ -75,7 +75,22 @@ python "<closed-loop-dev>/scripts/install.py" --target <저장소> --name "<프�
 | `.cursor/rules/cld-*.mdc` | `--cursor` 일 때 — 규칙은 항상 적용, 스킬은 요청 시 |
 | 나머지 | A 의 `init` 과 같다 |
 
-### 깔리는 것(두 방식 공통)
+### C. 기존 문서가 있는 저장소(도입)
+
+이미 계획 · 세션 프롬프트 · 인수인계 문서가 있으면 새 문서를 만들지 않고 붙인다(병렬 문서를 만들지 않는다).
+
+```
+python "<closed-loop-dev>/scripts/install.py" --target <저장소> --name "<프로젝트>" --adopt \
+    --master-plan <계획.md> --session-prompts <프롬프트.md> --handover <인수인계.md> \
+    [--tasks-dir tasks] [--changelog CHANGELOG.md] [--plan-state-column 상태] [--rules process,verification]
+```
+
+- 규칙은 기존 규칙과 겹치지 않는 것만 고른다(예: git · 문체 규칙이 이미 있으면 `--rules process,verification`).
+- 인수인계의 «쓰는 법» 절 뒤, 맨 위 항목 앞에 `<!-- cld:handover-insert -->` 한 줄을 넣는다(설치가 없으면 알린다). 그러면 `status` · `handover check` 가 된다.
+- 계획 Phase 표의 상태가 «상태» 열이 아니면 `--plan-state-column` 으로 그 열 이름을 준다.
+- 세션 프롬프트 문서는 공통 블록을 ```` ```cld-common ```` 으로, Phase 본문을 ```` ```cld-body ```` 로 옮긴 뒤부터 `prompt build` 가 된다. 옮기기 전에는 `status` 가 안내만 한다.
+
+### 깔리는 것(A · B 공통 — C 는 문서 · tasks · CHANGELOG 를 빼고)
 
 | 경로 | 무엇 |
 |---|---|
@@ -123,6 +138,7 @@ Python 3.11+ 표준 라이브러리만 쓴다. 대상 저장소에서 `python .c
 | 표 | 키 | 뜻 |
 |---|---|---|
 | `[docs]` | `master_plan` · `session_prompts` · `handover` · `tasks_dir` · `changelog` | 문서 경로(저장소 루트 기준) |
+| `[plan]` | `state_column`(«상태») | Phase 표에서 상태를 읽는 열 |
 | `[prompt]` | `header_max_lines`(10) · `ultracode_keyword` | 머리 상한 · 🔴 에만 들어가는 낱말 |
 | `[handover]` | `max_section_lines`(80) | 항목 권고 상한(넘으면 경고) |
 | `[guard]` | `git_write`(true) · `extra_deny`(정규식 목록) | PreToolUse 가드 |
