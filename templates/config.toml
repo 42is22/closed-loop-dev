@@ -1,0 +1,45 @@
+# closed-loop-dev 설정 — {{PROJECT}} ({{DATE}} init)
+# 하네스(.cld/harness/cld.py) · 훅이 읽는다. 경로는 저장소 루트 기준이다.
+
+[project]
+name = "{{PROJECT}}"
+lang = "ko"
+
+[docs]
+master_plan = "{{MASTER_PLAN}}"
+session_prompts = "{{SESSION_PROMPTS}}"
+handover = "{{HANDOVER}}"
+tasks_dir = "{{TASKS_DIR}}"
+changelog = "{{CHANGELOG}}"
+
+[prompt]
+header_max_lines = 10          # 붙이는 머리(빈 줄 · 구분선 포함) 상한
+ultracode_keyword = "ultracode" # 🔴 세션 머리에만 들어가는 낱말(이 낱말이 모드를 켠다)
+
+[handover]
+max_section_lines = 80         # 항목 하나의 비지 않은 줄 권고 상한(넘으면 경고 — 한 쪽)
+
+[guard]
+git_write = true               # 에이전트의 git commit · push · 태그 만들기 · reset · checkout … 을 훅이 거부한다
+extra_deny = []                # 더 막을 명령의 정규식(예: '\\bpip\\s+install\\b')
+
+[hooks]
+session_start = true           # 세션 시작 때 폐루프 상태를 문맥으로 넣는다
+stop_reminder = true           # 코드가 바뀌었는데 인수인계가 그대로면 멈출 때 알린다(막지 않는다)
+code_paths = ["src"]           # «코드» 로 볼 경로
+
+[verify]
+heavy_processes = []           # 검증 에이전트가 띄우면 안 되는 것(빌드 · 서버 · 긴 게이트) — 에이전트 규칙 문장에 들어간다
+
+[verify.lenses]                # 바뀐 파일 glob → 검토 관점(비면 기본 관점 넷)
+# "src/*" = "정합성 — 바뀐 코드가 주장대로 도는가"
+
+# 게이트 — 같은 group 은 동시에, group 은 오름차순. cmd 는 인자 목록(셸을 거치지 않는다).
+# expect 가 있으면 출력에 그 정규식이 있어야 통과다.
+# [[gates]]
+# name = "unit"
+# cmd = ["python", "-m", "unittest", "discover", "-s", "tests"]
+# group = 1
+# expect = "OK"
+# timeout = 1800
+# env = { PYTHONIOENCODING = "utf-8" }
